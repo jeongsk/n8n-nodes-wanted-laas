@@ -217,7 +217,10 @@ export class WantedLaaS implements INodeType {
 					const response = await this.helpers.request(options);
 
 					if (!response?.choices?.[0]?.message?.content) {
-						throw new NodeOperationError(this.getNode(), 'Invalid response format from Grok API');
+						throw new NodeOperationError(
+							this.getNode(),
+							'Invalid response format from Wanted LaaS API',
+						);
 					}
 
 					const typedResponse = response as IWantedLaaSResponse;
