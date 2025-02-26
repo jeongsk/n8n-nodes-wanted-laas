@@ -203,7 +203,7 @@ export class WantedLaaS implements INodeType {
 					};
 
 					const options: IRequestOptions = {
-						url: 'https://api-laas.wanted.co.kr/v1/chat/completions',
+						url: 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions',
 						headers: {
 							project: `${credentials.project}`,
 							apiKey: `${credentials.apiKey}`,
