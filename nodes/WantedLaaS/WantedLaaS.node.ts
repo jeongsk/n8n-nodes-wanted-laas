@@ -93,7 +93,7 @@ export class WantedLaaS implements INodeType {
 				typeOptions: {
 					rows: 4,
 				},
-				default: '',
+				default: '={{ $json.chatInput }}',
 				description: 'The message to send to the chat model',
 				required: true,
 			},
