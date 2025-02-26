@@ -196,23 +196,35 @@ export class WantedLaaS implements INodeType {
 
 					const requestBody = {
 						hash,
-						params,
+						params: JSON.parse(JSON.stringify(params)),
 						messages,
 						temperature,
 						...additionalFields,
 					};
 
 					const options: IRequestOptions = {
+						method: 'POST' as IHttpRequestMethods,
 						url: 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions',
 						headers: {
 							project: `${credentials.project}`,
 							apiKey: `${credentials.apiKey}`,
 							'Content-Type': 'application/json',
 						},
-						method: 'POST' as IHttpRequestMethods,
 						body: requestBody,
 						json: true,
 					};
+
+					// 요청 데이터 로깅
+					if (options.headers) {
+						console.log('Request Data:', {
+							url: options.url,
+							body: requestBody,
+							headers: {
+								project: options.headers.project,
+								// apiKey는 보안상 제외
+							},
+						});
+					}
 
 					const response = await this.helpers.request(options);
 
@@ -234,10 +246,19 @@ export class WantedLaaS implements INodeType {
 					});
 				}
 			} catch (error) {
+				// 에러 상세 정보 로깅
+				console.error('Error details:', {
+					message: error.message,
+					response: error.response?.data,
+					status: error.response?.status,
+					stack: error.stack,
+				});
+
 				if (this.continueOnFail()) {
 					returnData.push({
 						json: {
 							error: (error as Error).message,
+							errorDetails: error.response?.data,
 						},
 						pairedItem: { item: i },
 					});
