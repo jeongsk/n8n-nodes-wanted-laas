@@ -87,16 +87,6 @@ export class WantedLaaS implements INodeType {
 				placeholder: 'You are a helpful assistant...',
 			},
 			{
-				displayName: 'Parameters',
-				name: 'params',
-				type: 'json',
-				default: '={}',
-				description: 'Additional parameters to pass to the API',
-				typeOptions: {
-					alwaysOpenEditWindow: true,
-				},
-			},
-			{
 				displayName: 'Message',
 				name: 'message',
 				type: 'string',
@@ -106,6 +96,16 @@ export class WantedLaaS implements INodeType {
 				default: '={{ $json.chatInput }}',
 				description: 'The message to send to the chat model',
 				required: true,
+			},
+			{
+				displayName: 'Params',
+				name: 'params',
+				type: 'json',
+				default: '={}',
+				description: 'Additional params to pass to the API',
+				typeOptions: {
+					alwaysOpenEditWindow: true,
+				},
 			},
 			{
 				displayName: 'Temperature',
@@ -122,6 +122,20 @@ export class WantedLaaS implements INodeType {
 				default: {},
 				options: [
 					{
+						displayName: 'Max Tokens',
+						name: 'max_tokens',
+						type: 'number',
+						default: 1000,
+						description: 'The maximum number of tokens to generate',
+					},
+					{
+						displayName: 'Top P',
+						name: 'top_p',
+						type: 'number',
+						default: 1,
+						description: 'An alternative to sampling with temperature, called nucleus sampling',
+					},
+					{
 						displayName: 'Frequency Penalty',
 						name: 'frequency_penalty',
 						type: 'number',
@@ -130,26 +144,12 @@ export class WantedLaaS implements INodeType {
 							'Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency.',
 					},
 					{
-						displayName: 'Max Tokens',
-						name: 'max_tokens',
-						type: 'number',
-						default: 1000,
-						description: 'The maximum number of tokens to generate',
-					},
-					{
 						displayName: 'Presence Penalty',
 						name: 'presence_penalty',
 						type: 'number',
 						default: 0,
 						description:
 							'Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far.',
-					},
-					{
-						displayName: 'Top P',
-						name: 'top_p',
-						type: 'number',
-						default: 1,
-						description: 'An alternative to sampling with temperature, called nucleus sampling',
 					},
 				],
 			},
