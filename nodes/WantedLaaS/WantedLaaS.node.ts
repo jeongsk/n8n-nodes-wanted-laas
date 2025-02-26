@@ -87,6 +87,16 @@ export class WantedLaaS implements INodeType {
 				placeholder: 'You are a helpful assistant...',
 			},
 			{
+				displayName: 'Parameters',
+				name: 'params',
+				type: 'json',
+				default: '={}',
+				description: 'Additional parameters to pass to the API',
+				typeOptions: {
+					alwaysOpenEditWindow: true,
+				},
+			},
+			{
 				displayName: 'Message',
 				name: 'message',
 				type: 'string',
