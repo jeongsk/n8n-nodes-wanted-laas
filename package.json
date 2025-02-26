@@ -42,7 +42,7 @@
 			"dist/credentials/WantedLaaSApi.credentials.js"
 		],
 		"nodes": [
-			"dist/nodes/WantedLaaS/WantedLaaS.node.ts"
+			"dist/nodes/WantedLaaS/WantedLaaS.node.js"
 		]
 	},
 	"devDependencies": {
