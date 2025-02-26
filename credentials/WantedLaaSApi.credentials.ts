@@ -17,18 +17,18 @@ export class WantedLaaSApi implements ICredentialType {
 
 	properties: INodeProperties[] = [
 		{
-			displayName: 'API Key',
-			name: 'apiKey',
-			type: 'string',
-			typeOptions: { password: true },
-			required: true,
-			default: '',
-		},
-		{
 			displayName: 'Project',
 			name: 'project',
 			type: 'string',
 			typeOptions: { password: false },
+			required: true,
+			default: '',
+		},
+		{
+			displayName: 'API Key',
+			name: 'apiKey',
+			type: 'string',
+			typeOptions: { password: true },
 			required: true,
 			default: '',
 		},
@@ -47,7 +47,7 @@ export class WantedLaaSApi implements ICredentialType {
 	test: ICredentialTestRequest = {
 		request: {
 			baseURL: 'https://api-laas.wanted.co.kr',
-			url: '/model/refresh',
+			url: '/health',
 		},
 	};
 }
