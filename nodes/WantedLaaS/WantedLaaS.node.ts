@@ -184,6 +184,9 @@ export class WantedLaaS implements INodeType {
 		if (!credentials?.apiKey) {
 			throw new NodeOperationError(this.getNode(), 'No valid API key provided');
 		}
+		if (!credentials?.project) {
+			throw new NodeOperationError(this.getNode(), 'No valid project provided');
+		}
 
 		for (let i = 0; i < items.length; i++) {
 			const hash = this.getNodeParameter('hash', i) as string;
@@ -192,7 +195,7 @@ export class WantedLaaS implements INodeType {
 			const systemPrompt = this.getNodeParameter('system_prompt', i, '') as string;
 			const message = this.getNodeParameter('message', i, '') as string;
 			const temperature = this.getNodeParameter('temperature', i) as number;
-			const additionalFields = this.getNodeParameter('additionalFields', i) as IDataObject;
+			const additionalFields = this.getNodeParameter('additionalFields', i, {}) as IDataObject;
 
 			let requestBody: IDataObject = {};
 			try {
@@ -220,6 +223,10 @@ export class WantedLaaS implements INodeType {
 						if (temperature < 0 || temperature > 2) {
 							throw new NodeOperationError(this.getNode(), 'Temperature must be between 0 and 2');
 						}
+					}
+
+					if (!hash.trim()) {
+						throw new NodeOperationError(this.getNode(), 'Preset Hash cannot be empty');
 					}
 
 					const top_p = additionalFields.top_p as number | undefined;
@@ -265,10 +272,10 @@ export class WantedLaaS implements INodeType {
 						...additionalFields,
 					};
 
-					// params 파라미터 처리 개선
-					if (requestBody.params) {
+					if (params && Object.keys(params).length > 0) {
 						try {
 							requestBody.params = typeof params === 'string' ? JSON.parse(params) : params;
+
 							if (typeof requestBody.params !== 'object' || requestBody.params === null) {
 								throw new NodeOperationError(this.getNode(), 'Params must be a valid JSON object');
 							}
@@ -289,14 +296,6 @@ export class WantedLaaS implements INodeType {
 
 					if (temperature !== null && temperature !== undefined) {
 						requestBody.temperature = temperature;
-					}
-
-					if (additionalFields.response_format) {
-						// response_format이 설정된 경우 형식 조정
-						requestBody.response_format = {
-							type: additionalFields.response_format as string,
-						};
-						delete additionalFields.response_format;
 					}
 
 					const options: IRequestOptions = {
@@ -323,9 +322,9 @@ export class WantedLaaS implements INodeType {
 						});
 					}
 
-					let response;
+					let response: IWantedLaaSResponse;
 					try {
-						response = await this.helpers.request(options);
+						response = (await this.helpers.request(options)) as IWantedLaaSResponse;
 					} catch (error) {
 						let errorMessage = 'Request to Wanted LaaS API failed';
 
@@ -370,21 +369,8 @@ export class WantedLaaS implements INodeType {
 						);
 					}
 
-					const typedResponse = response as IWantedLaaSResponse;
-					const messageContent = typedResponse.choices[0].message.content.trim();
-
-					// 응답에서 민감한 정보를 제거하거나 마스킹하는 로직 추가
-					const sanitizedResponse = {
-						...typedResponse,
-						id: typedResponse.id.substring(0, 8) + '...', // ID 일부만 표시
-					};
-
 					returnData.push({
-						json: {
-							response: messageContent,
-							usage: sanitizedResponse.usage,
-							model: sanitizedResponse.model,
-						},
+						json: response,
 						pairedItem: { item: i },
 					});
 				}
