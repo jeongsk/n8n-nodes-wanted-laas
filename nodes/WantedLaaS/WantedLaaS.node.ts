@@ -95,7 +95,6 @@ export class WantedLaaS implements INodeType {
 				},
 				default: '={{ $json.chatInput }}',
 				description: 'The message to send to the chat model',
-				required: true,
 			},
 			{
 				displayName: 'Params',
@@ -168,15 +167,16 @@ export class WantedLaaS implements INodeType {
 		}
 
 		for (let i = 0; i < items.length; i++) {
-			try {
-				const hash = this.getNodeParameter('hash', i) as string;
-				const operation = this.getNodeParameter('operation', i) as string;
-				const params = this.getNodeParameter('params', i) as IDataObject;
-				const systemPrompt = this.getNodeParameter('system_prompt', i, '') as string;
-				const message = this.getNodeParameter('message', i) as string;
-				const temperature = this.getNodeParameter('temperature', i) as number;
-				const additionalFields = this.getNodeParameter('additionalFields', i) as IDataObject;
+			const hash = this.getNodeParameter('hash', i) as string;
+			const operation = this.getNodeParameter('operation', i) as string;
+			const params = this.getNodeParameter('params', i) as IDataObject;
+			const systemPrompt = this.getNodeParameter('system_prompt', i, '') as string;
+			const message = this.getNodeParameter('message', i) as string;
+			const temperature = this.getNodeParameter('temperature', i) as number;
+			const additionalFields = this.getNodeParameter('additionalFields', i) as IDataObject;
 
+			let requestBody: IDataObject = {};
+			try {
 				if (operation === 'chat') {
 					const messages = [];
 
@@ -189,14 +189,16 @@ export class WantedLaaS implements INodeType {
 					}
 
 					// Add user message
-					messages.push({
-						role: 'user',
-						content: message,
-					});
+					if (message) {
+						messages.push({
+							role: 'user',
+							content: message,
+						});
+					}
 
-					const requestBody = {
+					requestBody = {
 						hash,
-						params: JSON.parse(JSON.stringify(params)),
+						params: typeof params === 'string' ? JSON.parse(params) : params,
 						messages,
 						temperature,
 						...additionalFields,
@@ -218,7 +220,7 @@ export class WantedLaaS implements INodeType {
 					if (options.headers) {
 						console.log('Request Data:', {
 							url: options.url,
-							body: requestBody,
+							body: JSON.stringify(requestBody, null, 2),
 							headers: {
 								project: options.headers.project,
 								// apiKey는 보안상 제외
@@ -251,6 +253,8 @@ export class WantedLaaS implements INodeType {
 					message: error.message,
 					response: error.response?.data,
 					status: error.response?.status,
+					headers: error.response?.headers,
+					requestBody: JSON.stringify(requestBody, null, 2),
 					stack: error.stack,
 				});
 
