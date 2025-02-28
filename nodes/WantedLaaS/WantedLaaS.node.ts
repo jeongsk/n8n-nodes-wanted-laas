@@ -215,13 +215,72 @@ export class WantedLaaS implements INodeType {
 						});
 					}
 
+					// 파라미터 유효성 검사
+					if (temperature !== null && temperature !== undefined) {
+						if (temperature < 0 || temperature > 2) {
+							throw new NodeOperationError(this.getNode(), 'Temperature must be between 0 and 2');
+						}
+					}
+
+					const top_p = additionalFields.top_p as number | undefined;
+					if (top_p !== undefined) {
+						if (typeof top_p !== 'number' || top_p < 0 || top_p > 1) {
+							throw new NodeOperationError(
+								this.getNode(),
+								'Top P must be a number between 0 and 1',
+							);
+						}
+					}
+
+					const frequency_penalty = additionalFields.frequency_penalty as number | undefined;
+					if (frequency_penalty !== undefined) {
+						if (
+							typeof frequency_penalty !== 'number' ||
+							frequency_penalty < -2 ||
+							frequency_penalty > 2
+						) {
+							throw new NodeOperationError(
+								this.getNode(),
+								'Frequency penalty must be a number between -2 and 2',
+							);
+						}
+					}
+
+					const presence_penalty = additionalFields.presence_penalty as number | undefined;
+					if (presence_penalty !== undefined) {
+						if (
+							typeof presence_penalty !== 'number' ||
+							presence_penalty < -2 ||
+							presence_penalty > 2
+						) {
+							throw new NodeOperationError(
+								this.getNode(),
+								'Presence penalty must be a number between -2 and 2',
+							);
+						}
+					}
+
 					requestBody = {
 						hash,
 						...additionalFields,
 					};
 
-					if (requestBody.params && Object.keys(requestBody.params).length > 0) {
-						requestBody.params = typeof params === 'string' ? JSON.parse(params) : params;
+					// params 파라미터 처리 개선
+					if (requestBody.params) {
+						try {
+							requestBody.params = typeof params === 'string' ? JSON.parse(params) : params;
+							if (typeof requestBody.params !== 'object' || requestBody.params === null) {
+								throw new NodeOperationError(this.getNode(), 'Params must be a valid JSON object');
+							}
+						} catch (error) {
+							if (error instanceof Error) {
+								throw new NodeOperationError(
+									this.getNode(),
+									`Invalid params format: ${error.message}`,
+								);
+							}
+							throw error;
+						}
 					}
 
 					if (messages && messages.length > 0) {
@@ -264,21 +323,67 @@ export class WantedLaaS implements INodeType {
 						});
 					}
 
-					const response = await this.helpers.request(options);
+					let response;
+					try {
+						response = await this.helpers.request(options);
+					} catch (error) {
+						let errorMessage = 'Request to Wanted LaaS API failed';
 
-					if (!response?.choices?.[0]?.message?.content) {
+						if (error.response) {
+							switch (error.response.status) {
+								case 400:
+									errorMessage = 'Bad request: Please check your input parameters';
+									break;
+								case 401:
+									errorMessage = 'Authentication failed: Please check your API credentials';
+									break;
+								case 403:
+									errorMessage = 'Access forbidden: Please check your API permissions';
+									break;
+								case 429:
+									errorMessage = 'Too many requests: Please try again later';
+									break;
+								default:
+									errorMessage = `API Error (${error.response.status}): ${error.response.data?.message || error.message}`;
+							}
+						}
+
+						throw new NodeOperationError(this.getNode(), errorMessage);
+					}
+
+					// 응답 유효성 검사 강화
+					if (!response) {
+						throw new NodeOperationError(this.getNode(), 'Empty response from API');
+					}
+
+					if (!Array.isArray(response.choices)) {
 						throw new NodeOperationError(
 							this.getNode(),
-							'Invalid response format from Wanted LaaS API',
+							'Invalid response format: missing choices array',
+						);
+					}
+
+					if (!response.choices[0]?.message?.content) {
+						throw new NodeOperationError(
+							this.getNode(),
+							'Invalid response format: missing message content',
 						);
 					}
 
 					const typedResponse = response as IWantedLaaSResponse;
 					const messageContent = typedResponse.choices[0].message.content.trim();
 
+					// 응답에서 민감한 정보를 제거하거나 마스킹하는 로직 추가
+					const sanitizedResponse = {
+						...typedResponse,
+						id: typedResponse.id.substring(0, 8) + '...', // ID 일부만 표시
+					};
+
 					returnData.push({
 						json: {
 							response: messageContent,
+							usage: sanitizedResponse.usage,
+							model: sanitizedResponse.model,
 						},
 						pairedItem: { item: i },
 					});
