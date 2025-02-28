@@ -188,9 +188,9 @@ export class WantedLaaS implements INodeType {
 		for (let i = 0; i < items.length; i++) {
 			const hash = this.getNodeParameter('hash', i) as string;
 			const operation = this.getNodeParameter('operation', i) as string;
-			const params = this.getNodeParameter('params', i) as IDataObject;
+			const params = this.getNodeParameter('params', i, {}) as IDataObject;
 			const systemPrompt = this.getNodeParameter('system_prompt', i, '') as string;
-			const message = this.getNodeParameter('message', i) as string;
+			const message = this.getNodeParameter('message', i, '') as string;
 			const temperature = this.getNodeParameter('temperature', i) as number;
 			const additionalFields = this.getNodeParameter('additionalFields', i) as IDataObject;
 
@@ -217,14 +217,23 @@ export class WantedLaaS implements INodeType {
 
 					requestBody = {
 						hash,
-						params: typeof params === 'string' ? JSON.parse(params) : params,
-						messages,
-						temperature,
 						...additionalFields,
 					};
 
-					// response_format이 설정된 경우 형식 조정
+					if (requestBody.params && Object.keys(requestBody.params).length > 0) {
+						requestBody.params = typeof params === 'string' ? JSON.parse(params) : params;
+					}
+
+					if (messages && messages.length > 0) {
+						requestBody.messages = messages;
+					}
+
+					if (temperature !== null && temperature !== undefined) {
+						requestBody.temperature = temperature;
+					}
+
 					if (additionalFields.response_format) {
+						// response_format이 설정된 경우 형식 조정
 						requestBody.response_format = {
 							type: additionalFields.response_format as string,
 						};
