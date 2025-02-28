@@ -121,6 +121,25 @@ export class WantedLaaS implements INodeType {
 				default: {},
 				options: [
 					{
+						displayName: 'Response Format',
+						name: 'response_format',
+						type: 'options',
+						options: [
+							{
+								name: 'Text',
+								value: 'text',
+								description: 'Text format response',
+							},
+							{
+								name: 'JSON Object',
+								value: 'json_object',
+								description: 'JSON object format response',
+							},
+						],
+						default: 'text',
+						description: 'The format of the response',
+					},
+					{
 						displayName: 'Max Tokens',
 						name: 'max_tokens',
 						type: 'number',
@@ -203,6 +222,14 @@ export class WantedLaaS implements INodeType {
 						temperature,
 						...additionalFields,
 					};
+
+					// response_format이 설정된 경우 형식 조정
+					if (additionalFields.response_format) {
+						requestBody.response_format = {
+							type: additionalFields.response_format as string,
+						};
+						delete additionalFields.response_format;
+					}
 
 					const options: IRequestOptions = {
 						method: 'POST' as IHttpRequestMethods,
