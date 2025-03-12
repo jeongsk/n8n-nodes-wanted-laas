@@ -267,6 +267,12 @@ export class WantedLaaS implements INodeType {
 						}
 					}
 
+					if(additionalFields.response_format) {
+						additionalFields.response_format = {
+							type: additionalFields.response_format
+						}
+					}
+
 					requestBody = {
 						hash,
 						...additionalFields,
