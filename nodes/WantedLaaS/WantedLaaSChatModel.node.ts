@@ -1,14 +1,14 @@
+import { ChatOpenAI, type ClientOptions } from '@langchain/openai';
 import type {
-	IExecuteFunctions,
-	INodeType,
-	INodeTypeDescription,
 	IDataObject,
 	IHttpRequestMethods,
+	INodeType,
+	INodeTypeDescription,
 	IRequestOptions,
+	ISupplyDataFunctions,
 	SupplyData,
 } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
-
 interface IWantedLaaSResponse extends IDataObject {
 	id: string;
 	model: string;
@@ -32,29 +32,31 @@ interface IWantedLaaSResponse extends IDataObject {
 export class WantedLaaSChatModel implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Wanted LaaS Chat Model',
-		name: 'wantedLaasChatModel',
+		name: 'lmChatWantedLaaS',
 		icon: { light: 'file:WantedLaaS.svg', dark: 'file:WantedLaaS-dark.svg' },
 		group: ['transform'],
-		version: 1,
-		description: 'Wanted LaaS Language Model for AI Agents and Chains',
+		version: [1],
+		description: 'For advanced usage with an AI chain',
 		defaults: {
 			name: 'Wanted LaaS Chat Model',
 		},
 		codex: {
 			categories: ['AI'],
 			subcategories: {
-				AI: ['Language Models'],
+				AI: ['Language Models', 'Root Nodes'],
+				'Language Models': ['Chat Models (Recommended)'],
 			},
 			resources: {
 				primaryDocumentation: [
 					{
-						url: 'https://docs.wanted.co.kr/laas',
+						url: 'https://docs.n8n.io/integrations/builtin/cluster-nodes/sub-nodes/n8n-nodes-langchain.lmchatopenai/',
 					},
 				],
 			},
 		},
-		inputs: ['main'],
-		outputs: ['main'],
+
+		inputs: [], // eslint-disable-line
+		outputs: ['ai_languageModel'] as any, // eslint-disable-line
 		outputNames: ['Model'],
 		credentials: [
 			{
@@ -62,6 +64,10 @@ export class WantedLaaSChatModel implements INodeType {
 				required: true,
 			},
 		],
+		requestDefaults: {
+			ignoreHttpStatusErrors: true,
+			baseURL: 'https://api-laas.wanted.co.kr/api/preset/v2/',
+		},
 		properties: [
 			{
 				displayName: 'Preset Hash',
@@ -74,10 +80,11 @@ export class WantedLaaSChatModel implements INodeType {
 					'The hash of the model to use. You can find this in the URL when viewing a model in the Wanted LaaS dashboard.',
 			},
 			{
-				displayName: 'Model Parameters',
-				name: 'modelParameters',
+				displayName: 'Options',
+				name: 'options',
+				placeholder: 'Add Option',
+				description: 'Additional options to add',
 				type: 'collection',
-				placeholder: 'Add Parameter',
 				default: {},
 				options: [
 					{
@@ -90,14 +97,19 @@ export class WantedLaaSChatModel implements INodeType {
 							numberPrecision: 1,
 						},
 						default: 0.7,
-						description: 'Controls randomness in the output',
+						description:
+							'Controls randomness: Lowering results in less random completions. As the temperature approaches zero, the model will become deterministic and repetitive.',
 					},
 					{
-						displayName: 'Max Tokens',
+						displayName: 'Maximum Number of Tokens',
 						name: 'max_tokens',
 						type: 'number',
-						default: 1000,
-						description: 'The maximum number of tokens to generate',
+						default: -1,
+						description:
+							'The maximum number of tokens to generate in the completion. Most models have a context length of 2048 tokens (except for the newest models, which support 32,768).',
+						typeOptions: {
+							maxValue: 32768,
+						},
 					},
 					{
 						displayName: 'Top P',
@@ -109,7 +121,8 @@ export class WantedLaaSChatModel implements INodeType {
 							numberPrecision: 2,
 						},
 						default: 1,
-						description: 'An alternative to sampling with temperature, called nucleus sampling',
+						description:
+							'Controls diversity via nucleus sampling: 0.5 means half of all likelihood-weighted options are considered. We generally recommend altering this or temperature but not both.',
 					},
 					{
 						displayName: 'Frequency Penalty',
@@ -122,7 +135,7 @@ export class WantedLaaSChatModel implements INodeType {
 						},
 						default: 0,
 						description:
-							'Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency',
+							"Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim",
 					},
 					{
 						displayName: 'Presence Penalty',
@@ -135,26 +148,41 @@ export class WantedLaaSChatModel implements INodeType {
 						},
 						default: 0,
 						description:
-							'Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far',
+							"Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics",
 					},
 					{
 						displayName: 'Response Format',
-						name: 'response_format',
+						name: 'responseFormat',
 						type: 'options',
 						options: [
 							{
 								name: 'Text',
 								value: 'text',
-								description: 'Text format response',
+								description: 'Regular text response',
 							},
 							{
 								name: 'JSON Object',
 								value: 'json_object',
-								description: 'JSON object format response',
+								description:
+									'Enables JSON mode, which should guarantee the message the model generates is valid JSON',
 							},
 						],
 						default: 'text',
 						description: 'The format of the response',
+					},
+					{
+						displayName: 'Timeout',
+						name: 'timeout',
+						default: 60000,
+						description: 'Maximum amount of time a request is allowed to take in milliseconds',
+						type: 'number',
+					},
+					{
+						displayName: 'Max Retries',
+						name: 'maxRetries',
+						default: 2,
+						description: 'Maximum number of retries to attempt',
+						type: 'number',
 					},
 				],
 			},
@@ -173,7 +201,7 @@ export class WantedLaaSChatModel implements INodeType {
 
 	methods = {};
 
-	async supplyData(this: IExecuteFunctions, itemIndex: number): Promise<SupplyData> {
+	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
 		const credentials = await this.getCredentials('wantedLaaSApi');
 
 		if (!credentials?.apiKey) {
@@ -184,7 +212,17 @@ export class WantedLaaSChatModel implements INodeType {
 		}
 
 		const hash = this.getNodeParameter('hash', itemIndex) as string;
-		const modelParameters = this.getNodeParameter('modelParameters', itemIndex, {}) as IDataObject;
+		const options = this.getNodeParameter('options', itemIndex, {}) as {
+			frequencyPenalty?: number;
+			maxTokens?: number;
+			maxRetries: number;
+			timeout: number;
+			presencePenalty?: number;
+			temperature?: number;
+			topP?: number;
+			responseFormat?: 'text' | 'json_object';
+			reasoningEffort?: 'low' | 'medium' | 'high';
+		};
 		const additionalParams = this.getNodeParameter('params', itemIndex, {}) as IDataObject;
 
 		if (!hash.trim()) {
@@ -205,17 +243,15 @@ export class WantedLaaSChatModel implements INodeType {
 						const requestBody: IDataObject = {
 							hash,
 							messages,
-							...modelParameters,
+							...options,
 						};
 
-						// Handle response_format properly
-						if (modelParameters.response_format) {
+						if (options.responseFormat) {
 							requestBody.response_format = {
-								type: modelParameters.response_format as string,
+								type: options.responseFormat as string,
 							};
 						}
 
-						// Merge additional parameters
 						if (additionalParams && Object.keys(additionalParams).length > 0) {
 							try {
 								const parsedParams =
@@ -232,57 +268,37 @@ export class WantedLaaSChatModel implements INodeType {
 							}
 						}
 
-						const options: IRequestOptions = {
-							method: 'POST' as IHttpRequestMethods,
-							url: 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions',
-							headers: {
-								project: `${credentials.project}`,
-								apiKey: `${credentials.apiKey}`,
-								'Content-Type': 'application/json',
+						const configuration: ClientOptions = {
+							fetch: async (_, __): Promise<Response> => {
+								const _options: IRequestOptions = {
+									method: 'POST' as IHttpRequestMethods,
+									url: 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions',
+									headers: {
+										'Content-Type': 'application/json',
+										project: `${credentials.project}`,
+										apiKey: `${credentials.apiKey}`,
+									},
+									body: requestBody,
+									json: true,
+									timeout: options.timeout ?? 60000,
+								};
+								const response = (await this.helpers.request(_options)) as IWantedLaaSResponse;
+								return response as unknown as Response;
 							},
-							body: requestBody,
-							json: true,
 						};
 
-						try {
-							const response = (await this.helpers.request(options)) as IWantedLaaSResponse;
+						const model = new ChatOpenAI({
+							openAIApiKey: credentials.apiKey as string,
+							model: hash,
+							...options,
+							timeout: options.timeout ?? 60000,
+							maxRetries: options.maxRetries ?? 2,
+							configuration,
+						});
 
-							if (!response?.choices?.[0]?.message?.content) {
-								throw new NodeOperationError(
-									this.getNode(),
-									'Invalid response format from Wanted LaaS API',
-								);
-							}
-
-							return {
-								output: response.choices[0].message.content,
-							};
-						} catch (error) {
-							if (error.response) {
-								const statusCode = error.response.status;
-								let errorMessage = 'Wanted LaaS API error';
-
-								switch (statusCode) {
-									case 400:
-										errorMessage = 'Bad request: Please check your input parameters';
-										break;
-									case 401:
-										errorMessage = 'Authentication failed: Please check your API credentials';
-										break;
-									case 403:
-										errorMessage = 'Access forbidden: Please check your API permissions';
-										break;
-									case 429:
-										errorMessage = 'Too many requests: Please try again later';
-										break;
-									default:
-										errorMessage = `API Error (${statusCode}): ${error.response.data?.message || error.message}`;
-								}
-
-								throw new NodeOperationError(this.getNode(), errorMessage);
-							}
-							throw error;
-						}
+						return {
+							response: model,
+						};
 					},
 				},
 			},
