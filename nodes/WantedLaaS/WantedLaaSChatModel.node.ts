@@ -1,22 +1,41 @@
-import {
-	NodeConnectionType,
-	type IExecuteFunctions,
-	type INodeType,
-	type INodeTypeDescription,
-	type IDataObject,
-	type SupplyData,
-	NodeOperationError,
+import type {
+	IExecuteFunctions,
+	INodeType,
+	INodeTypeDescription,
+	IDataObject,
+	IHttpRequestMethods,
+	IRequestOptions,
+	SupplyData,
 } from 'n8n-workflow';
-import { ChatOpenAI } from 'langchain/chat_models/openai';
+import { NodeOperationError } from 'n8n-workflow';
 
-export class WantedLaasChatModel implements INodeType {
+interface IWantedLaaSResponse extends IDataObject {
+	id: string;
+	model: string;
+	created: number;
+	object: string;
+	usage: {
+		prompt_tokens: number;
+		completion_tokens: number;
+		total_tokens: number;
+	};
+	choices: Array<{
+		message: {
+			role: string;
+			content: string;
+		};
+		finish_reason: string;
+		index: number;
+	}>;
+}
+
+export class WantedLaaSChatModel implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Wanted LaaS Chat Model',
 		name: 'wantedLaasChatModel',
 		icon: { light: 'file:WantedLaaS.svg', dark: 'file:WantedLaaS-dark.svg' },
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["hash"] || "Chat Model"}}',
 		description: 'Wanted LaaS Language Model for AI Agents and Chains',
 		defaults: {
 			name: 'Wanted LaaS Chat Model',
@@ -24,7 +43,7 @@ export class WantedLaasChatModel implements INodeType {
 		codex: {
 			categories: ['AI'],
 			subcategories: {
-				AI: ['Language Models', 'Chat Models & Completion Endpoints'],
+				AI: ['Language Models'],
 			},
 			resources: {
 				primaryDocumentation: [
@@ -34,8 +53,8 @@ export class WantedLaasChatModel implements INodeType {
 				],
 			},
 		},
-		inputs: [],
-		outputs: [NodeConnectionType.AiLanguageModel],
+		inputs: ['main'],
+		outputs: ['main'],
 		outputNames: ['Model'],
 		credentials: [
 			{
@@ -44,13 +63,6 @@ export class WantedLaasChatModel implements INodeType {
 			},
 		],
 		properties: [
-			{
-				displayName: '',
-				name: 'notice',
-				type: 'notice',
-				default: '',
-				description: 'Connect Wanted LaaS Chat Model to an AI Agent or AI Chain node',
-			},
 			{
 				displayName: 'Preset Hash',
 				name: 'hash',
@@ -159,6 +171,8 @@ export class WantedLaasChatModel implements INodeType {
 		],
 	};
 
+	methods = {};
+
 	async supplyData(this: IExecuteFunctions, itemIndex: number): Promise<SupplyData> {
 		const credentials = await this.getCredentials('wantedLaaSApi');
 
@@ -177,118 +191,101 @@ export class WantedLaasChatModel implements INodeType {
 			throw new NodeOperationError(this.getNode(), 'Preset Hash cannot be empty');
 		}
 
-		// Create a wrapper for making requests to Wanted LaaS API
-		const wantedLaaSWrapper = async (messages: any[]) => {
-			const requestBody: IDataObject = {
-				hash,
-				messages: messages.map((msg: any) => ({
-					role: msg._getType() === 'human' ? 'user' : msg._getType() === 'assistant' ? 'assistant' : 'system',
-					content: msg.content,
-				})),
-				...modelParameters,
-			};
+		return {
+			response: {
+				model: {
+					invoke: async (prompt: string) => {
+						const messages = [
+							{
+								role: 'user',
+								content: prompt,
+							},
+						];
 
-			// Handle response_format properly
-			if (modelParameters.response_format) {
-				requestBody.response_format = {
-					type: modelParameters.response_format as string,
-				};
-			}
+						const requestBody: IDataObject = {
+							hash,
+							messages,
+							...modelParameters,
+						};
 
-			// Merge additional parameters
-			if (additionalParams && Object.keys(additionalParams).length > 0) {
-				try {
-					const parsedParams =
-						typeof additionalParams === 'string'
-							? JSON.parse(additionalParams)
-							: additionalParams;
+						// Handle response_format properly
+						if (modelParameters.response_format) {
+							requestBody.response_format = {
+								type: modelParameters.response_format as string,
+							};
+						}
 
-					requestBody.params = parsedParams;
-				} catch (error: any) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Invalid params format: ${error.message}`,
-					);
-				}
-			}
+						// Merge additional parameters
+						if (additionalParams && Object.keys(additionalParams).length > 0) {
+							try {
+								const parsedParams =
+									typeof additionalParams === 'string'
+										? JSON.parse(additionalParams)
+										: additionalParams;
 
-			const options = {
-				method: 'POST' as const,
-				url: 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions',
-				headers: {
-					project: `${credentials.project}`,
-					apiKey: `${credentials.apiKey}`,
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(requestBody),
-			};
+								requestBody.params = parsedParams;
+							} catch (error) {
+								throw new NodeOperationError(
+									this.getNode(),
+									`Invalid params format: ${error.message}`,
+								);
+							}
+						}
 
-			try {
-				const response = await this.helpers.httpRequest(options);
+						const options: IRequestOptions = {
+							method: 'POST' as IHttpRequestMethods,
+							url: 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions',
+							headers: {
+								project: `${credentials.project}`,
+								apiKey: `${credentials.apiKey}`,
+								'Content-Type': 'application/json',
+							},
+							body: requestBody,
+							json: true,
+						};
 
-				if (!response?.choices?.[0]?.message?.content) {
-					throw new NodeOperationError(
-						this.getNode(),
-						'Invalid response format from Wanted LaaS API',
-					);
-				}
+						try {
+							const response = (await this.helpers.request(options)) as IWantedLaaSResponse;
 
-				return response.choices[0].message.content;
-			} catch (error: any) {
-				if (error.response) {
-					const statusCode = error.response.status;
-					let errorMessage = 'Wanted LaaS API error';
+							if (!response?.choices?.[0]?.message?.content) {
+								throw new NodeOperationError(
+									this.getNode(),
+									'Invalid response format from Wanted LaaS API',
+								);
+							}
 
-					switch (statusCode) {
-						case 400:
-							errorMessage = 'Bad request: Please check your input parameters';
-							break;
-						case 401:
-							errorMessage = 'Authentication failed: Please check your API credentials';
-							break;
-						case 403:
-							errorMessage = 'Access forbidden: Please check your API permissions';
-							break;
-						case 429:
-							errorMessage = 'Too many requests: Please try again later';
-							break;
-						default:
-							errorMessage = `API Error (${statusCode}): ${
-								error.response.data?.message || error.message
-							}`;
-					}
+							return {
+								output: response.choices[0].message.content,
+							};
+						} catch (error) {
+							if (error.response) {
+								const statusCode = error.response.status;
+								let errorMessage = 'Wanted LaaS API error';
 
-					throw new NodeOperationError(this.getNode(), errorMessage);
-				}
-				throw error;
-			}
-		};
+								switch (statusCode) {
+									case 400:
+										errorMessage = 'Bad request: Please check your input parameters';
+										break;
+									case 401:
+										errorMessage = 'Authentication failed: Please check your API credentials';
+										break;
+									case 403:
+										errorMessage = 'Access forbidden: Please check your API permissions';
+										break;
+									case 429:
+										errorMessage = 'Too many requests: Please try again later';
+										break;
+									default:
+										errorMessage = `API Error (${statusCode}): ${error.response.data?.message || error.message}`;
+								}
 
-		// Create a ChatOpenAI instance with custom configuration
-		const model = new ChatOpenAI({
-			openAIApiKey: credentials.apiKey as string,
-			modelName: hash, // Use hash as model name
-			temperature: (modelParameters.temperature as number) || 0.7,
-			maxTokens: (modelParameters.max_tokens as number) || 1000,
-			topP: (modelParameters.top_p as number) || 1,
-			frequencyPenalty: (modelParameters.frequency_penalty as number) || 0,
-			presencePenalty: (modelParameters.presence_penalty as number) || 0,
-			timeout: 60000,
-			maxRetries: 2,
-			configuration: {
-				baseURL: 'https://api-laas.wanted.co.kr/api/preset/v2',
-				defaultHeaders: {
-					project: credentials.project as string,
-					apiKey: credentials.apiKey as string,
+								throw new NodeOperationError(this.getNode(), errorMessage);
+							}
+							throw error;
+						}
+					},
 				},
 			},
-		});
-
-		// Override the _call method to use our custom wrapper
-		(model as any)._call = wantedLaaSWrapper.bind(this);
-
-		return {
-			response: model,
 		};
 	}
 }
