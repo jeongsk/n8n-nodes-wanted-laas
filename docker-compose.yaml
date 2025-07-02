@@ -1,0 +1,18 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n-dev
+    restart: unless-stopped
+    ports:
+      - 5679:5678
+    environment:
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=false
+      - N8N_ENCRYPTION_KEY=n8n_encryption_key
+      - N8N_USER_MANAGEMENT_JWT_SECRET=n8n_user_management_jwt_secret
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./.n8n/data:/home/node/.n8n
+      - ./dist:/home/node/.n8n/custom/node_modules/n8n-nodes-wanted-laas
