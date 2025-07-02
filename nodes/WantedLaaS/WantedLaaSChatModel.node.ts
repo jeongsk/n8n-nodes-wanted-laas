@@ -229,79 +229,116 @@ export class WantedLaaSChatModel implements INodeType {
 			throw new NodeOperationError(this.getNode(), 'Preset Hash cannot be empty');
 		}
 
-		return {
-			response: {
-				model: {
-					invoke: async (prompt: string) => {
-						const messages = [
-							{
-								role: 'user',
-								content: prompt,
-							},
-						];
-
-						const requestBody: IDataObject = {
-							hash,
-							messages,
-							...options,
-						};
-
-						if (options.responseFormat) {
-							requestBody.response_format = {
-								type: options.responseFormat as string,
-							};
-						}
-
-						if (additionalParams && Object.keys(additionalParams).length > 0) {
-							try {
-								const parsedParams =
-									typeof additionalParams === 'string'
-										? JSON.parse(additionalParams)
-										: additionalParams;
-
-								requestBody.params = parsedParams;
-							} catch (error) {
-								throw new NodeOperationError(
-									this.getNode(),
-									`Invalid params format: ${error.message}`,
-								);
-							}
-						}
-
-						const configuration: ClientOptions = {
-							fetch: async (_, __): Promise<Response> => {
-								const _options: IRequestOptions = {
-									method: 'POST' as IHttpRequestMethods,
-									url: 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions',
-									headers: {
-										'Content-Type': 'application/json',
-										project: `${credentials.project}`,
-										apiKey: `${credentials.apiKey}`,
-									},
-									body: requestBody,
-									json: true,
-									timeout: options.timeout ?? 60000,
-								};
-								const response = (await this.helpers.request(_options)) as IWantedLaaSResponse;
-								return response as unknown as Response;
-							},
-						};
-
-						const model = new ChatOpenAI({
-							openAIApiKey: credentials.apiKey as string,
-							model: hash,
-							...options,
-							timeout: options.timeout ?? 60000,
-							maxRetries: options.maxRetries ?? 2,
-							configuration,
-						});
-
-						return {
-							response: model,
-						};
-					},
-				},
+		const configuration: ClientOptions = {
+			baseURL: 'https://api-laas.wanted.co.kr/api/preset/v2',
+			defaultHeaders: {
+				'Content-Type': 'application/json',
+				project: `${credentials.project}`,
+				apiKey: `${credentials.apiKey}`,
 			},
+			fetch: async (url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+				const endpoint = typeof url === 'string' ? url : url.toString();
+				const isCompletionsEndpoint = endpoint.includes('/chat/completions');
+				
+				if (!isCompletionsEndpoint) {
+					return new Response(JSON.stringify({ error: 'Unsupported endpoint' }), {
+						status: 404,
+						headers: { 'Content-Type': 'application/json' },
+					});
+				}
+
+				const body = init?.body ? JSON.parse(init.body as string) : {};
+				
+				const requestBody: IDataObject = {
+					hash,
+					messages: body.messages || [],
+					temperature: body.temperature,
+					max_tokens: body.max_tokens,
+					top_p: body.top_p,
+					frequency_penalty: body.frequency_penalty,
+					presence_penalty: body.presence_penalty,
+				};
+
+				if (body.response_format) {
+					requestBody.response_format = body.response_format;
+				}
+
+				if (additionalParams && Object.keys(additionalParams).length > 0) {
+					try {
+						const parsedParams =
+							typeof additionalParams === 'string'
+								? JSON.parse(additionalParams)
+								: additionalParams;
+
+						requestBody.params = parsedParams;
+					} catch (error) {
+						throw new NodeOperationError(
+							this.getNode(),
+							`Invalid params format: ${error.message}`,
+						);
+					}
+				}
+
+				const requestOptions: IRequestOptions = {
+					method: 'POST' as IHttpRequestMethods,
+					url: 'https://api-laas.wanted.co.kr/api/preset/v2/chat/completions',
+					headers: {
+						'Content-Type': 'application/json',
+						project: `${credentials.project}`,
+						apiKey: `${credentials.apiKey}`,
+					},
+					body: requestBody,
+					json: true,
+					timeout: options.timeout ?? 60000,
+				};
+
+				try {
+					const response = (await this.helpers.request(requestOptions)) as IWantedLaaSResponse;
+					
+					const openAIResponse = {
+						id: response.id,
+						object: response.object,
+						created: response.created,
+						model: response.model || hash,
+						choices: response.choices,
+						usage: response.usage,
+					};
+
+					return new Response(JSON.stringify(openAIResponse), {
+						status: 200,
+						headers: { 'Content-Type': 'application/json' },
+					});
+				} catch (error) {
+					console.error('Error calling Wanted LaaS API:', error);
+					return new Response(JSON.stringify({ error: error.message }), {
+						status: 500,
+						headers: { 'Content-Type': 'application/json' },
+					});
+				}
+			},
+		};
+
+		const model = new ChatOpenAI({
+			openAIApiKey: credentials.apiKey as string,
+			model: hash,
+			temperature: options.temperature,
+			maxTokens: options.maxTokens === -1 ? undefined : options.maxTokens,
+			topP: options.topP,
+			frequencyPenalty: options.frequencyPenalty,
+			presencePenalty: options.presencePenalty,
+			timeout: options.timeout ?? 60000,
+			maxRetries: options.maxRetries ?? 2,
+			configuration,
+		});
+
+		if (options.responseFormat === 'json_object') {
+			model.modelKwargs = {
+				response_format: { type: 'json_object' },
+			};
+		}
+
+		return {
+			response: model,
 		};
 	}
 }
