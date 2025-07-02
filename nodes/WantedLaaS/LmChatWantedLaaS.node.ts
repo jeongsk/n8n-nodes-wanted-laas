@@ -29,7 +29,7 @@ interface IWantedLaaSResponse extends IDataObject {
 	}>;
 }
 
-export class WantedLaaSChatModel implements INodeType {
+export class LmChatWantedLaaS implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Wanted LaaS Chat Model',
 		name: 'lmChatWantedLaaS',
@@ -88,43 +88,6 @@ export class WantedLaaSChatModel implements INodeType {
 				default: {},
 				options: [
 					{
-						displayName: 'Temperature',
-						name: 'temperature',
-						type: 'number',
-						typeOptions: {
-							minValue: 0,
-							maxValue: 2,
-							numberPrecision: 1,
-						},
-						default: 0.7,
-						description:
-							'Controls randomness: Lowering results in less random completions. As the temperature approaches zero, the model will become deterministic and repetitive.',
-					},
-					{
-						displayName: 'Maximum Number of Tokens',
-						name: 'max_tokens',
-						type: 'number',
-						default: -1,
-						description:
-							'The maximum number of tokens to generate in the completion. Most models have a context length of 2048 tokens (except for the newest models, which support 32,768).',
-						typeOptions: {
-							maxValue: 32768,
-						},
-					},
-					{
-						displayName: 'Top P',
-						name: 'top_p',
-						type: 'number',
-						typeOptions: {
-							minValue: 0,
-							maxValue: 1,
-							numberPrecision: 2,
-						},
-						default: 1,
-						description:
-							'Controls diversity via nucleus sampling: 0.5 means half of all likelihood-weighted options are considered. We generally recommend altering this or temperature but not both.',
-					},
-					{
 						displayName: 'Frequency Penalty',
 						name: 'frequency_penalty',
 						type: 'number',
@@ -136,6 +99,24 @@ export class WantedLaaSChatModel implements INodeType {
 						default: 0,
 						description:
 							"Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim",
+					},
+					{
+						displayName: 'Max Retries',
+						name: 'maxRetries',
+						default: 2,
+						description: 'Maximum number of retries to attempt',
+						type: 'number',
+					},
+					{
+						displayName: 'Maximum Number of Tokens',
+						name: 'max_tokens',
+						type: 'number',
+						default: -1,
+						description:
+							'The maximum number of tokens to generate in the completion. Most models have a context length of 2048 tokens (except for the newest models, which support 32,768).',
+						typeOptions: {
+							maxValue: 32768,
+						},
 					},
 					{
 						displayName: 'Presence Penalty',
@@ -171,6 +152,19 @@ export class WantedLaaSChatModel implements INodeType {
 						description: 'The format of the response',
 					},
 					{
+						displayName: 'Temperature',
+						name: 'temperature',
+						type: 'number',
+						typeOptions: {
+							minValue: 0,
+							maxValue: 2,
+							numberPrecision: 1,
+						},
+						default: 0.7,
+						description:
+							'Controls randomness: Lowering results in less random completions. As the temperature approaches zero, the model will become deterministic and repetitive.',
+					},
+					{
 						displayName: 'Timeout',
 						name: 'timeout',
 						default: 60000,
@@ -178,11 +172,17 @@ export class WantedLaaSChatModel implements INodeType {
 						type: 'number',
 					},
 					{
-						displayName: 'Max Retries',
-						name: 'maxRetries',
-						default: 2,
-						description: 'Maximum number of retries to attempt',
+						displayName: 'Top P',
+						name: 'top_p',
 						type: 'number',
+						typeOptions: {
+							minValue: 0,
+							maxValue: 1,
+							numberPrecision: 2,
+						},
+						default: 1,
+						description:
+							'Controls diversity via nucleus sampling: 0.5 means half of all likelihood-weighted options are considered. We generally recommend altering this or temperature but not both.',
 					},
 				],
 			},

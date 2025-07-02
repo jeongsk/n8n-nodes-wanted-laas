@@ -121,6 +121,29 @@ export class WantedLaaS implements INodeType {
 				default: {},
 				options: [
 					{
+						displayName: 'Frequency Penalty',
+						name: 'frequency_penalty',
+						type: 'number',
+						default: 0,
+						description:
+							'Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency.',
+					},
+					{
+						displayName: 'Max Tokens',
+						name: 'max_tokens',
+						type: 'number',
+						default: 1000,
+						description: 'The maximum number of tokens to generate',
+					},
+					{
+						displayName: 'Presence Penalty',
+						name: 'presence_penalty',
+						type: 'number',
+						default: 0,
+						description:
+							'Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far.',
+					},
+					{
 						displayName: 'Response Format',
 						name: 'response_format',
 						type: 'options',
@@ -140,34 +163,11 @@ export class WantedLaaS implements INodeType {
 						description: 'The format of the response',
 					},
 					{
-						displayName: 'Max Tokens',
-						name: 'max_tokens',
-						type: 'number',
-						default: 1000,
-						description: 'The maximum number of tokens to generate',
-					},
-					{
 						displayName: 'Top P',
 						name: 'top_p',
 						type: 'number',
 						default: 1,
 						description: 'An alternative to sampling with temperature, called nucleus sampling',
-					},
-					{
-						displayName: 'Frequency Penalty',
-						name: 'frequency_penalty',
-						type: 'number',
-						default: 0,
-						description:
-							'Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency.',
-					},
-					{
-						displayName: 'Presence Penalty',
-						name: 'presence_penalty',
-						type: 'number',
-						default: 0,
-						description:
-							'Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far.',
 					},
 				],
 			},

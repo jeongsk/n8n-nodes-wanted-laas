@@ -44,7 +44,7 @@
 		],
 		"nodes": [
 			"dist/nodes/WantedLaaS/WantedLaaS.node.js",
-			"dist/nodes/WantedLaaS/WantedLaaSChatModel.node.js"
+			"dist/nodes/WantedLaaS/LmChatWantedLaaS.node.js"
 		]
 	},
 	"devDependencies": {
