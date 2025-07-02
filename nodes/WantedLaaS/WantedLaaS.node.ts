@@ -36,7 +36,7 @@ export class WantedLaaS implements INodeType {
 		icon: { light: 'file:WantedLaaS.svg', dark: 'file:WantedLaaS-dark.svg' },
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["operation"]}}',
+		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description: 'Interact with Wanted LaaS API',
 		defaults: {
 			name: 'Wanted LaaS',
